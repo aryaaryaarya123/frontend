@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Expense Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* accent colours — same in both themes */
+    --amber: #f5a623;
+    --amber-glow: rgba(245,166,35,0.14);
+    --red: #e05252;
+    --green: #52c97c;
+    --green-glow: rgba(82,201,124,0.13);
+    --blue: #5287e0;
+    --teal: #52c9b8;
+    --purple: #9d72e0;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Fraunces', serif;
+    /* dark theme defaults */
+    --bg: #0e0f11;
+    --surface: #161719;
+    --surface2: #1e1f23;
+    --border: #2a2b30;
+    --border-light: #3a3c45;
+    --text: #f0f1f4;
+    --text-muted: #9da0b0;
+    --text-dim: #5a5e6e;
+    --grid-line: rgba(245,166,35,0.025);
+    --input-bg: #0a0b0d;
+  }
+  [data-theme="light"] {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface2: #eef0f4;
+    --border: #dde0e8;
+    --border-light: #c8ccd8;
+    --text: #111318;
+    --text-muted: #5a5e72;
+    --text-dim: #9da0b0;
+    --grid-line: rgba(100,110,140,0.06);
+    --input-bg: #f9fafc;
+    --amber-glow: rgba(245,166,35,0.10);
+    --green-glow: rgba(82,201,124,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; line-height: 1.5; }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 36px 24px 60px; }
+
+  /* HEADER */
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  .logo { font-family: var(--serif); font-size: 1.85rem; font-weight: 700; color: var(--amber); letter-spacing: -0.02em; }
+  .logo span { color: var(--text-muted); font-weight: 300; font-style: italic; font-size: 0.9rem; margin-left: 10px; }
+  .header-right { display: flex; align-items: center; gap: 18px; }
+  .header-dates { text-align: right; }
+  .header-date-bs { font-size: 0.78rem; color: var(--amber); letter-spacing: 0.04em; }
+  .header-date-ad { font-size: 0.67rem; color: var(--text-dim); margin-top: 3px; }
+
+  /* THEME TOGGLE */
+  .theme-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
+  .theme-toggle .t-icon { font-size: 1rem; line-height: 1; }
+
+  /* POOL BANNER */
+  .pool-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 26px 28px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr 1px 1fr 1px 1.4fr;
+    align-items: center;
+    gap: 0;
+    position: relative; overflow: hidden;
+  }
+  .pool-banner::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--green) 0%, var(--teal) 40%, var(--amber) 70%, var(--red) 100%);
+  }
+  .pool-divider { height: 52px; background: var(--border); }
+  .pool-stat { padding: 0 24px; }
+  .pool-stat:first-child { padding-left: 0; }
+  .pool-net { padding: 0 24px; }
+  .pool-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 7px; }
+  .pool-value { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+  .pool-value.inc  { color: var(--green); }
+  .pool-value.exp  { color: var(--red); }
+  .pool-value.pos  { color: var(--green); }
+  .pool-value.neg  { color: var(--red); }
+  .pool-value.neu  { color: var(--amber); }
+  .pool-sub { font-size: 0.67rem; color: var(--text-dim); margin-top: 4px; }
+
+  /* MEMBER CARDS */
+  .members-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .member-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 18px 20px; position: relative; overflow: hidden; transition: border-color 0.2s; }
+  .member-card:hover { border-color: var(--border-light); }
+  .member-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .m-arya::after   { background: var(--amber); }
+  .m-umanga::after { background: var(--teal); }
+  .m-gaurav::after { background: var(--purple); }
+  .member-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1rem; font-weight: 700; margin-bottom: 10px; color: #000; }
+  .member-name { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; letter-spacing: 0.02em; }
+  .member-total { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; color: var(--green); }
+  .member-sub { font-size: 0.67rem; color: var(--text-dim); margin-top: 3px; }
+
+  /* TABS */
+  .tab-bar { display: flex; gap: 0; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+  .tab-btn { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 22px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; position: relative; bottom: -1px; border-bottom: 2px solid transparent; transition: color 0.15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+  /* MAIN GRID */
+  .main-grid { display: grid; grid-template-columns: 1fr 330px; gap: 22px; }
+  .right-panel { display: flex; flex-direction: column; gap: 16px; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.14em; color: #ffffff; font-weight: 700; margin-bottom: 13px; display: flex; align-items: center; gap: 10px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  [data-theme="light"] .section-title { color: #111318; }
+
+  /* FILTER BAR */
+  .filter-bar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-btn { font-family: var(--mono); font-size: 0.7rem; padding: 4px 11px; border-radius: 2px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.15s; }
+  .filter-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .filter-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber); }
+  .filter-btn.g:hover  { border-color: var(--green); color: var(--green); }
+  .filter-btn.g.active { background: var(--green-glow); border-color: var(--green); color: var(--green); }
+
+  /* LIST */
+  .list-scroll { max-height: 490px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .tx-list { display: flex; flex-direction: column; gap: 2px; }
+  .tx-item { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 12px 15px; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 13px; transition: all 0.15s; animation: slideIn 0.2s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .tx-item:hover { background: var(--surface2); border-color: var(--border-light); }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tx-info { min-width: 0; }
+  .tx-name { font-size: 0.85rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tx-meta { font-size: 0.67rem; color: var(--text-dim); margin-top: 2px; }
+  .tx-amount { font-family: var(--serif); font-size: 0.93rem; font-weight: 500; white-space: nowrap; }
+  .tx-amount.exp { color: var(--red); }
+  .tx-amount.inc { color: var(--green); }
+  .delete-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; padding: 4px 6px; border-radius: 2px; transition: all 0.15s; line-height: 1; }
+  .delete-btn:hover { color: var(--red); background: rgba(224,82,82,0.1); }
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-dim); font-size: 0.8rem; border: 1px dashed var(--border); border-radius: 4px; }
+  .empty-state .icon { font-size: 1.7rem; margin-bottom: 10px; display: block; }
+
+  /* FORM PANEL */
+  .form-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block;
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+  [data-theme="light"] .form-group label { color: #111318; }
+  .form-group input, .form-group select { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 2px; padding: 9px 11px; color: var(--text); font-family: var(--mono); font-size: 0.85rem; transition: border-color 0.15s; outline: none; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--amber); }
+  .form-group select option { background: var(--surface2); }
+  .submit-btn { width: 100%; border: none; border-radius: 2px; padding: 11px; font-family: var(--mono); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; margin-top: 4px; }
+  .submit-btn.exp-btn { background: var(--amber); color: #000; }
+  .submit-btn.exp-btn:hover { background: #f0b84a; transform: translateY(-1px); }
+  .submit-btn.inc-btn { background: var(--green); color: #000; }
+  .submit-btn.inc-btn:hover { background: #68d691; transform: translateY(-1px); }
+  .submit-btn:active { transform: translateY(0) !important; }
+
+  /* BREAKDOWN */
+  .breakdown-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; }
+  .bd-item { margin-bottom: 12px; }
+  .bd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 0.74rem; }
+  .bd-name { display: flex; align-items: center; gap: 7px; color: var(--text-muted); }
+  .bd-amt { color: var(--text); }
+  .bar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; transition: width 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+
+  /* OWING SYSTEM */
+  .owing-layout { display: grid; grid-template-columns: 1fr 330px; gap: 22px; }
+
+  .net-matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .net-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .net-card.owed-positive { border-color: var(--green); }
+  .net-card.owed-negative { border-color: var(--red); }
+
+  .net-card-name { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px; }
+  .net-card-val  { font-family: var(--serif); font-size: 1.2rem; font-weight: 700; }
+  .net-card-val.pos { color: var(--green); }
+  .net-card-val.neg { color: var(--red); }
+  .net-card-val.zero{ color: var(--text-dim); }
+  .net-card-sub  { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; }
+
+  .debt-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .debt-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 13px 16px;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 13px;
+    transition: all 0.15s;
+    animation: slideIn 0.2s ease;
+  }
+  .debt-item:hover { background: var(--surface2); border-color: var(--border-light); }
+  .debt-item.settled { opacity: 0.45; }
+  .debt-item.settled .debt-amount { text-decoration: line-through; color: var(--text-dim); }
+
+  .debt-arrow {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+  }
+  .debt-from { color: var(--red); font-weight: 500; }
+  .debt-to   { color: var(--green); font-weight: 500; }
+  .arrow-icon { color: var(--text-dim); font-size: 0.8rem; }
+
+  .debt-info { min-width: 0; }
+  .debt-desc { font-size: 0.84rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .debt-meta { font-size: 0.67rem; color: var(--text-dim); margin-top: 2px; }
+  .debt-amount { font-family: var(--serif); font-size: 0.95rem; font-weight: 500; color: var(--red); white-space: nowrap; }
+
+  .settle-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.65rem;
+    font-family: var(--mono);
+    padding: 4px 9px;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .settle-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+  .settle-btn.settled-state { border-color: var(--border); color: var(--text-dim); }
+  .settle-btn.settled-state:hover { border-color: var(--red); color: var(--red); background: rgba(224,82,82,0.08); }
+
+  .owing-filter-bar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  /* SPLIT FORM */
+  .split-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .split-opt {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    cursor: pointer;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .split-opt:hover { border-color: var(--amber); color: var(--amber); }
+  .split-opt.selected { background: var(--amber-glow); border-color: var(--amber); color: var(--amber); font-weight: 600; }
+  .split-opt .split-icon { font-size: 1rem; display: block; margin-bottom: 3px; }
+
+  .split-detail { margin-top: 10px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; }
+  .split-detail-title { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+  .split-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .split-row:last-child { margin-bottom: 0; }
+  .split-person-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .split-person-name { font-size: 0.76rem; color: var(--text); flex: 1; }
+  .split-person-share { font-size: 0.76rem; color: var(--amber); font-weight: 600; white-space: nowrap; }
+  .split-check { width: 16px; height: 16px; accent-color: var(--amber); cursor: pointer; flex-shrink: 0; }
+  .split-custom-input { width: 90px; background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 4px 7px; color: var(--text); font-family: var(--mono); font-size: 0.78rem; outline: none; }
+  .split-custom-input:focus { border-color: var(--amber); }
+
+  /* BALANCE TAB */
+  .balance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .balance-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .balance-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; transition: opacity 0.2s; }
+  .balance-card.owed::after  { background: var(--green); }
+  .balance-card.owes::after  { background: var(--red); }
+  .balance-card.clear::after { background: var(--amber); }
+  .balance-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 1rem; color: #000; margin-bottom: 12px; }
+  .balance-name { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 4px; }
+  .balance-amount { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .balance-amount.owed-val  { color: var(--green); }
+  .balance-amount.owes-val  { color: var(--red); }
+  .balance-amount.clear-val { color: var(--amber); }
+  .balance-status { font-size: 0.67rem; color: var(--text-dim); }
+  .balance-breakdown { font-size: 0.67rem; color: var(--text-dim); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .balance-breakdown div { display: flex; justify-content: space-between; margin-bottom: 3px; }
+
+  .settlement-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 24px; margin-bottom: 24px; }
+  .settlement-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .settlement-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .settlement-people { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+  .settlement-from { font-weight: 600; }
+  .settlement-arrow { color: var(--text-dim); font-size: 0.8rem; }
+  .settlement-to { font-weight: 600; }
+  .settlement-amount { font-family: var(--serif); font-size: 1.1rem; font-weight: 700; color: var(--red); }
+  .mark-paid-btn {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 2px; border: 1px solid var(--green); background: var(--green-glow);
+    color: var(--green); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .mark-paid-btn:hover { background: var(--green); color: #000; }
+
+  .exp-split-badge {
+    font-size: 0.62rem; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+  }
+  .exp-split-badge.badge-split  { background: rgba(82,135,224,0.15); color: var(--blue); border: 1px solid rgba(82,135,224,0.3); }
+  .exp-split-badge.badge-solo   { background: rgba(122,125,138,0.12); color: var(--text-dim); border: 1px solid var(--border); }
+  .exp-split-badge.badge-partial{ background: rgba(157,114,224,0.15); color: var(--purple); border: 1px solid rgba(157,114,224,0.3); }
+
+  /* TAB PANELS */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 26px; right: 26px; background: var(--surface2); border: 1px solid var(--border-light); border-radius: 3px; padding: 10px 16px; font-size: 0.78rem; z-index: 999; animation: toastIn 0.3s ease, toastOut 0.3s ease 2.3s forwards; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.danger  { border-color: var(--red); color: var(--red); }
+  @keyframes toastIn  { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes toastOut { to   { opacity:0; transform:translateY(10px); } }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .pool-banner { grid-template-columns: 1fr 1fr; gap: 20px; }
+    .pool-divider { display: none; }
+    .pool-stat, .pool-net { padding: 0; }
+    .members-grid { grid-template-columns: 1fr; }
+    .main-grid { grid-template-columns: 1fr; }
+    .right-panel { order: -1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">Ledger <span>expense manager</span></div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
+        <span class="t-icon">🌙</span><span id="themeLabel">Dark Mode</span>
+      </button>
+      <div class="header-dates">
+        <div class="header-date-bs" id="headerBS"></div>
+        <div class="header-date-ad" id="headerAD"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- POOL BANNER -->
+  <div class="pool-banner">
+    <div class="pool-stat">
+      <div class="pool-label">Total Income</div>
+      <div class="pool-value inc" id="poolIncome">Rs 0</div>
+      <div class="pool-sub" id="poolIncSub">0 entries</div>
+    </div>
+    <div class="pool-divider"></div>
+    <div class="pool-stat">
+      <div class="pool-label">Total Expenses</div>
+      <div class="pool-value exp" id="poolExpense">Rs 0</div>
+      <div class="pool-sub" id="poolExpSub">0 entries</div>
+    </div>
+    <div class="pool-divider"></div>
+    <div class="pool-stat">
+      <div class="pool-label">This BS Month</div>
+      <div class="pool-value neu" id="poolMonth">Rs 0</div>
+      <div class="pool-sub" id="poolMonthSub">net this month</div>
+    </div>
+    <div class="pool-divider"></div>
+    <div class="pool-net">
+      <div class="pool-label">◈ Pool Balance</div>
+      <div class="pool-value neu" id="poolNet">Rs 0</div>
+      <div class="pool-sub" id="poolNetSub">income − expenses</div>
+    </div>
+  </div>
+
+  <!-- MEMBER CARDS -->
+  <div class="members-grid">
+    <div class="member-card m-arya">
+      <div class="member-avatar" style="background:var(--amber);">A</div>
+      <div class="member-name">Arya Lamsal</div>
+      <div class="member-total" id="arya-total">Rs 0</div>
+      <div class="member-sub" id="arya-sub">0 income entries</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:4px;">Balance</div>
+        <div style="font-family:var(--serif);font-size:1rem;font-weight:700;" id="arya-balance">—</div>
+        <div style="font-size:0.65rem;color:var(--text-dim);margin-top:2px;" id="arya-balance-sub"></div>
+      </div>
+    </div>
+    <div class="member-card m-umanga">
+      <div class="member-avatar" style="background:var(--teal);">U</div>
+      <div class="member-name">Umanga Regmi</div>
+      <div class="member-total" id="umanga-total">Rs 0</div>
+      <div class="member-sub" id="umanga-sub">0 income entries</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:4px;">Balance</div>
+        <div style="font-family:var(--serif);font-size:1rem;font-weight:700;" id="umanga-balance">—</div>
+        <div style="font-size:0.65rem;color:var(--text-dim);margin-top:2px;" id="umanga-balance-sub"></div>
+      </div>
+    </div>
+    <div class="member-card m-gaurav">
+      <div class="member-avatar" style="background:var(--purple);">G</div>
+      <div class="member-name">Gaurav Laudari</div>
+      <div class="member-total" id="gaurav-total">Rs 0</div>
+      <div class="member-sub" id="gaurav-sub">0 income entries</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:4px;">Balance</div>
+        <div style="font-family:var(--serif);font-size:1rem;font-weight:700;" id="gaurav-balance">—</div>
+        <div style="font-size:0.65rem;color:var(--text-dim);margin-top:2px;" id="gaurav-balance-sub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('expenses')">📤 Expenses</button>
+    <button class="tab-btn" onclick="switchTab('income')">📥 Income</button>
+    <button class="tab-btn" onclick="switchTab('owing')">💸 Owing</button>
+    <button class="tab-btn" onclick="switchTab('balances')">⚖️ Balances</button>
+  </div>
+
+  <!-- EXPENSE TAB -->
+  <div class="tab-panel active" id="tab-expenses">
+    <div class="main-grid">
+      <div>
+        <div class="section-title">Transactions</div>
+        <div class="filter-bar" id="expFilterBar"></div>
+        <div class="list-scroll">
+          <div class="tx-list" id="expenseList"></div>
+        </div>
+      </div>
+      <div class="right-panel">
+        <div class="form-panel">
+          <div class="section-title" style="margin-bottom:16px;">New Expense</div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="expName" placeholder="e.g. Grocery run" maxlength="60">
+          </div>
+          <div class="form-group">
+            <label>Amount (NPR)</label>
+            <input type="number" id="expAmount" placeholder="0.00" min="0" step="0.01" oninput="updateSplitPreview()">
+          </div>
+          <div class="form-group">
+            <label>Paid By</label>
+            <select id="expPaidBy" onchange="updateSplitPreview()">
+              <option value="Arya Lamsal">Arya Lamsal</option>
+              <option value="Umanga Regmi">Umanga Regmi</option>
+              <option value="Gaurav Laudari">Gaurav Laudari</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Split Type</label>
+            <div class="split-type-grid">
+              <button class="split-opt selected" data-split="equal3" onclick="setSplit('equal3',this)">
+                <span class="split-icon">👥</span>Split Equally<br><small style="opacity:0.7">All 3</small>
+              </button>
+              <button class="split-opt" data-split="equal2" onclick="setSplit('equal2',this)">
+                <span class="split-icon">👤</span>Split with One<br><small style="opacity:0.7">2 people</small>
+              </button>
+              <button class="split-opt" data-split="personal" onclick="setSplit('personal',this)">
+                <span class="split-icon">🙋</span>Personal<br><small style="opacity:0.7">No split</small>
+              </button>
+              <button class="split-opt" data-split="custom" onclick="setSplit('custom',this)">
+                <span class="split-icon">✏️</span>Custom<br><small style="opacity:0.7">Set amounts</small>
+              </button>
+            </div>
+            <div id="splitDetail" class="split-detail" style="display:none;"></div>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="expCat">
+              <option value="Food">🍽 Food & Dining</option>
+              <option value="Transport">🚗 Transport</option>
+              <option value="Housing">🏠 Housing</option>
+              <option value="Health">💊 Health</option>
+              <option value="Entertainment">🎮 Entertainment</option>
+              <option value="Shopping">🛍 Shopping</option>
+              <option value="Utilities">⚡ Utilities</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="expDate">
+          </div>
+          <button class="submit-btn exp-btn" onclick="addExpense()">+ Add Expense</button>
+        </div>
+        <div class="breakdown-panel">
+          <div class="section-title" style="margin-bottom:14px;">By Category</div>
+          <div id="expBreakdown"><div style="color:var(--text-dim);font-size:0.75rem;text-align:center;padding:14px 0;">No data yet</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCOME TAB -->
+  <div class="tab-panel" id="tab-income">
+    <div class="main-grid">
+      <div>
+        <div class="section-title">Income Entries</div>
+        <div class="filter-bar" id="incFilterBar">
+          <button class="filter-btn g active" data-p="All" onclick="setIncFilter('All')">All</button>
+          <button class="filter-btn g" data-p="Arya Lamsal" onclick="setIncFilter('Arya Lamsal')">Arya</button>
+          <button class="filter-btn g" data-p="Umanga Regmi" onclick="setIncFilter('Umanga Regmi')">Umanga</button>
+          <button class="filter-btn g" data-p="Gaurav Laudari" onclick="setIncFilter('Gaurav Laudari')">Gaurav</button>
+        </div>
+        <div class="list-scroll">
+          <div class="tx-list" id="incomeList"></div>
+        </div>
+      </div>
+      <div class="right-panel">
+        <div class="form-panel">
+          <div class="section-title" style="margin-bottom:16px;">New Income</div>
+          <div class="form-group">
+            <label>Person</label>
+            <select id="incPerson">
+              <option value="Arya Lamsal">Arya Lamsal</option>
+              <option value="Umanga Regmi">Umanga Regmi</option>
+              <option value="Gaurav Laudari">Gaurav Laudari</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="incName" placeholder="e.g. Monthly salary" maxlength="60">
+          </div>
+          <div class="form-group">
+            <label>Amount (NPR)</label>
+            <input type="number" id="incAmount" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Source</label>
+            <select id="incSource">
+              <option value="Salary">💼 Salary</option>
+              <option value="Freelance">💻 Freelance</option>
+              <option value="Business">🏪 Business</option>
+              <option value="Investment">📈 Investment</option>
+              <option value="Gift">🎁 Gift</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="incDate">
+          </div>
+          <button class="submit-btn inc-btn" onclick="addIncome()">+ Add Income</button>
+        </div>
+        <div class="breakdown-panel">
+          <div class="section-title" style="margin-bottom:14px;">By Source</div>
+          <div id="incBreakdown"><div style="color:var(--text-dim);font-size:0.75rem;text-align:center;padding:14px 0;">No data yet</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OWING TAB -->
+  <div class="tab-panel" id="tab-owing">
+    <!-- NET BALANCE CARDS -->
+    <div class="net-matrix" id="owingNetMatrix"></div>
+
+    <div class="owing-layout">
+      <!-- LEFT: DEBT LIST -->
+      <div>
+        <div class="section-title">Debts &amp; Settlements</div>
+        <div class="owing-filter-bar" id="owingFilterBar">
+          <button class="filter-btn active" data-f="all" onclick="setOwingFilter('all')">All</button>
+          <button class="filter-btn" data-f="unsettled" onclick="setOwingFilter('unsettled')">Unsettled</button>
+          <button class="filter-btn" data-f="settled" onclick="setOwingFilter('settled')">Settled</button>
+          <button class="filter-btn" data-f="Arya Lamsal" onclick="setOwingFilter('Arya Lamsal')">Arya</button>
+          <button class="filter-btn" data-f="Umanga Regmi" onclick="setOwingFilter('Umanga Regmi')">Umanga</button>
+          <button class="filter-btn" data-f="Gaurav Laudari" onclick="setOwingFilter('Gaurav Laudari')">Gaurav</button>
+        </div>
+        <div class="list-scroll">
+          <div class="debt-list" id="debtList"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: ADD DEBT FORM -->
+      <div class="right-panel">
+        <div class="form-panel">
+          <div class="section-title" style="margin-bottom:16px;">New Debt</div>
+          <div class="form-group">
+            <label>Who Owes</label>
+            <select id="debtFrom">
+              <option value="Arya Lamsal">Arya Lamsal</option>
+              <option value="Umanga Regmi">Umanga Regmi</option>
+              <option value="Gaurav Laudari">Gaurav Laudari</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Owes To</label>
+            <select id="debtTo">
+              <option value="Umanga Regmi">Umanga Regmi</option>
+              <option value="Gaurav Laudari">Gaurav Laudari</option>
+              <option value="Arya Lamsal">Arya Lamsal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Amount (NPR)</label>
+            <input type="number" id="debtAmount" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Reason</label>
+            <input type="text" id="debtDesc" placeholder="e.g. Dinner last night" maxlength="60">
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="debtDate">
+          </div>
+          <button class="submit-btn" style="background:var(--purple);color:#fff;" onclick="addDebt()">+ Add Debt</button>
+        </div>
+
+        <!-- SUMMARY PANEL -->
+        <div class="breakdown-panel" id="owingSummaryPanel">
+          <div class="section-title" style="margin-bottom:14px;">Summary</div>
+          <div id="owingSummary"><div style="color:var(--text-dim);font-size:0.75rem;text-align:center;padding:14px 0;">No debts yet</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BALANCES TAB -->
+  <div class="tab-panel" id="tab-balances">
+    <div class="section-title" style="margin-bottom:16px;">Roommate Balance Sheet</div>
+
+    <!-- Balance cards per person -->
+    <div class="balance-grid" id="balanceCards"></div>
+
+    <!-- Settlement suggestions -->
+    <div class="settlement-panel">
+      <div class="section-title" style="margin-bottom:16px;">Settlement Suggestions</div>
+      <div id="settlementRows">
+        <div style="color:var(--text-dim);font-size:0.8rem;text-align:center;padding:20px 0;">No shared expenses yet.</div>
+      </div>
+    </div>
+
+    <!-- Shared expense history -->
+    <div class="breakdown-panel">
+      <div class="section-title" style="margin-bottom:14px;">Shared Expense History</div>
+      <div class="list-scroll" style="max-height:360px;">
+        <div class="tx-list" id="sharedExpList"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════
+//  BS CALENDAR CONVERTER
+// ═══════════════════════════════
+const BS_MONTHS_NP = ['Baisakh','Jestha','Ashadh','Shrawan','Bhadra','Ashwin','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'];
+const NP_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+const BS_DATA = {
+  2000:[30,32,31,32,31,30,30,30,29,30,29,31], 2001:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2002:[31,31,32,32,31,30,30,29,30,29,30,30], 2003:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2004:[30,32,31,32,31,30,30,30,29,30,29,31], 2005:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2006:[31,31,32,32,31,30,30,29,30,29,30,30], 2007:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2008:[31,31,31,32,31,31,29,30,30,29,29,31], 2009:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2010:[31,31,32,32,31,30,30,29,30,29,30,30], 2011:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2012:[31,31,31,32,31,31,29,30,30,29,30,30], 2013:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2014:[31,31,32,32,31,30,30,29,30,29,30,30], 2015:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2016:[31,31,31,32,31,31,29,30,30,29,30,30], 2017:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2018:[31,31,32,32,31,30,30,29,30,29,30,30], 2019:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2020:[31,31,31,32,31,31,29,30,30,29,30,30], 2021:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2022:[31,31,32,32,31,30,30,29,30,29,30,30], 2023:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2024:[31,31,31,32,31,31,29,30,30,29,30,30], 2025:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2026:[31,31,32,32,31,30,30,29,30,29,30,30], 2027:[31,32,31,32,31,30,30,30,29,29,30,32],
+  2028:[30,32,31,32,31,30,30,30,29,30,29,31], 2029:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2030:[31,31,32,32,31,30,30,29,30,29,30,30], 2031:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2032:[30,32,31,32,31,30,30,30,29,30,29,31], 2033:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2034:[31,31,32,32,31,30,30,29,30,29,30,30], 2035:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2036:[31,31,31,32,31,31,29,30,30,29,30,30], 2037:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2038:[31,31,32,32,31,30,30,29,30,29,30,30], 2039:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2040:[31,31,31,32,31,31,29,30,30,29,30,30], 2041:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2042:[31,31,32,32,31,30,30,29,30,29,30,30], 2043:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2044:[30,32,31,32,31,30,30,30,29,30,29,31], 2045:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2046:[31,31,32,32,31,30,30,29,30,29,30,30], 2047:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2048:[31,31,31,32,31,31,29,30,30,29,30,30], 2049:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2050:[31,31,32,32,31,30,30,29,30,29,30,30], 2051:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2052:[31,31,31,32,31,31,29,30,30,29,30,30], 2053:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2054:[31,31,32,32,31,30,30,29,30,29,30,30], 2055:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2056:[31,31,31,32,31,31,29,30,30,29,30,30], 2057:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2058:[31,31,32,32,31,30,30,29,30,29,30,30], 2059:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2060:[31,31,31,32,31,31,29,30,30,29,30,30], 2061:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2062:[31,31,32,32,31,30,30,29,30,29,30,30], 2063:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2064:[31,31,31,32,31,31,29,30,30,29,30,30], 2065:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2066:[31,31,32,32,31,30,30,29,30,29,30,30], 2067:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2068:[31,31,31,32,31,31,29,30,30,29,30,30], 2069:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2070:[31,31,32,32,31,30,30,29,30,29,30,30], 2071:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2072:[31,31,31,32,31,31,29,30,30,29,30,30], 2073:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2074:[31,31,32,32,31,30,30,29,30,29,30,30], 2075:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2076:[31,31,31,32,31,31,29,30,30,29,30,30], 2077:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2078:[31,31,32,32,31,30,30,29,30,29,30,30], 2079:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2080:[31,31,31,32,31,31,29,30,30,29,30,30], 2081:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2082:[31,31,32,32,31,30,30,29,30,29,30,30], 2083:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2084:[31,31,31,32,31,31,29,30,30,29,30,30], 2085:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2086:[31,31,32,32,31,30,30,29,30,29,30,30], 2087:[31,32,31,32,31,30,30,30,29,29,30,31],
+  2088:[31,31,31,32,31,31,29,30,30,29,30,30], 2089:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2090:[31,31,32,32,31,30,30,29,30,29,30,30],
+};
+
+// Reference: 1944-01-01 AD = 2000-09-17 BS
+function adToBS(ad) {
+  const ref = new Date(1944, 0, 1);
+  const target = new Date(ad.getFullYear(), ad.getMonth(), ad.getDate());
+  let days = Math.round((target - ref) / 86400000);
+  let y = 2000, m = 9, d = 17; // BS ref start
+  while (days > 0) {
+    const mdays = (BS_DATA[y] || BS_DATA[2082])[m - 1];
+    const rem = mdays - d;
+    if (days <= rem) { d += days; days = 0; }
+    else { days -= (rem + 1); d = 1; m++; if (m > 12) { m = 1; y++; } }
+  }
+  return { y, m, d };
+}
+
+function fmtBS(adStr) {
+  const d = new Date(adStr + 'T12:00:00');
+  const bs = adToBS(d);
+  return `${bs.d} ${BS_MONTHS_NP[bs.m-1]} ${bs.y}`;
+}
+
+function todayBSStr() {
+  const d = new Date();
+  const bs = adToBS(d);
+  const day = NP_DAYS[d.getDay()];
+  return `${bs.d} ${BS_MONTHS_NP[bs.m-1]} ${bs.y} · ${day}`;
+}
+
+function todayBS() { return adToBS(new Date()); }
+
+// ═══════════════════════════════
+//  STATE  (loaded from API on boot)
+// ═══════════════════════════════
+let expenses = [];
+let incomes  = [];
+let activeExpF = 'All';
+let activeIncF = 'All';
+
+const todayAD = new Date().toISOString().split('T')[0];
+document.getElementById('expDate').value = todayAD;
+document.getElementById('incDate').value = todayAD;
+document.getElementById('headerBS').textContent = todayBSStr();
+document.getElementById('headerAD').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+const MEMBER_COLORS = { 'Arya Lamsal':'var(--amber)', 'Umanga Regmi':'var(--teal)', 'Gaurav Laudari':'var(--purple)' };
+const MEMBER_KEYS   = { 'Arya Lamsal':'arya', 'Umanga Regmi':'umanga', 'Gaurav Laudari':'gaurav' };
+
+const CAT_COLORS = {
+  Food:'#f5a623', Transport:'#5287e0', Housing:'#52c9b8',
+  Health:'#52c97c', Entertainment:'#9d72e0', Shopping:'#e05252',
+  Utilities:'#e08252', Other:'#7a7d8a'
+};
+const SRC_COLORS = {
+  Salary:'#52c97c', Freelance:'#52c9b8', Business:'#f5a623',
+  Investment:'#5287e0', Gift:'#9d72e0', Other:'#7a7d8a'
+};
+
+// ═══════════════════════════════
+//  API HELPERS
+// ═══════════════════════════════
+async function apiPost(url, data) {
+  try {
+    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error(await r.text());
+  } catch(e) { console.error('API POST error:', e); toast('Save failed — check connection', 'danger'); }
+}
+async function apiPut(url, data) {
+  try {
+    const r = await fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (!r.ok) throw new Error(await r.text());
+  } catch(e) { console.error('API PUT error:', e); }
+}
+async function apiDelete(url) {
+  try {
+    const r = await fetch(url, { method:'DELETE' });
+    if (!r.ok) throw new Error(await r.text());
+  } catch(e) { console.error('API DELETE error:', e); toast('Delete failed — check connection', 'danger'); }
+}
+
+// Legacy save() — no longer needed (each operation calls API directly)
+function save() {}
+
+// ═══════════════════════════════
+//  SPLIT SYSTEM
+// ═══════════════════════════════
+let currentSplitType = 'equal3';
+let splitPartner = 'Umanga Regmi'; // for equal2
+let customAmounts = {}; // for custom
+
+function setSplit(type, btn) {
+  currentSplitType = type;
+  document.querySelectorAll('.split-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  updateSplitPreview();
+}
+
+function updateSplitPreview() {
+  const amt    = parseFloat(document.getElementById('expAmount').value) || 0;
+  const paidBy = document.getElementById('expPaidBy').value;
+  const detail = document.getElementById('splitDetail');
+
+  // If splitPartner is the same as paidBy, auto-pick the first other person
+  if (splitPartner === paidBy) {
+    splitPartner = MEMBERS.find(m => m !== paidBy) || MEMBERS[0];
+  }
+
+  if (currentSplitType === 'personal') {
+    detail.style.display = 'none'; return;
+  }
+  detail.style.display = 'block';
+
+  if (currentSplitType === 'equal3') {
+    const share = amt / 3;
+    detail.innerHTML = `
+      <div class="split-detail-title">Each pays</div>
+      ${MEMBERS.map(m => `
+        <div class="split-row">
+          <span class="split-person-dot" style="background:${M_COL[m]}"></span>
+          <span class="split-person-name">${M_SHORT[m]}${m===paidBy?' (paid)':''}</span>
+          <span class="split-person-share">${fmt(share)}</span>
+        </div>`).join('')}`;
+  } else if (currentSplitType === 'equal2') {
+    const others = MEMBERS.filter(m => m !== paidBy);
+    const share = amt / 2;
+    detail.innerHTML = `
+      <div class="split-detail-title">Split with whom?</div>
+      ${others.map(m => `
+        <div class="split-row">
+          <input type="radio" class="split-check" name="partner" value="${m}" ${m===splitPartner?'checked':''} onchange="splitPartner='${m}';updateSplitPreview()">
+          <span class="split-person-dot" style="background:${M_COL[m]}"></span>
+          <span class="split-person-name">${M_SHORT[m]}</span>
+          <span class="split-person-share">${m===splitPartner?fmt(share):'—'}</span>
+        </div>`).join('')}
+      <div class="split-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+        <span class="split-person-dot" style="background:${M_COL[paidBy]}"></span>
+        <span class="split-person-name">${M_SHORT[paidBy]} (paid)</span>
+        <span class="split-person-share">${fmt(share)}</span>
+      </div>`;
+  } else if (currentSplitType === 'custom') {
+    detail.innerHTML = `
+      <div class="split-detail-title">Enter each person's share — must total ${fmt(amt)}</div>
+      ${MEMBERS.map(m => `
+        <div class="split-row">
+          <span class="split-person-dot" style="background:${M_COL[m]}"></span>
+          <span class="split-person-name">${M_SHORT[m]}${m===paidBy?' (paid)':''}</span>
+          <input type="number" class="split-custom-input" id="custom_${m.replace(/ /g,'_')}" placeholder="0" min="0" step="1" value="${customAmounts[m]||''}" oninput="customAmounts['${m}']=parseFloat(this.value)||0">
+        </div>`).join('')}`;
+  }
+}
+
+function computeShares(amount, paidBy) {
+  const shares = {};
+  if (currentSplitType === 'personal') {
+    shares[paidBy] = amount;
+    return shares;
+  }
+  if (currentSplitType === 'equal3') {
+    const s = Math.floor(amount / 3);
+    const remainder = amount - s * 3;
+    MEMBERS.forEach((m, i) => { shares[m] = s + (i === 0 ? remainder : 0); });
+    return shares;
+  }
+  if (currentSplitType === 'equal2') {
+    // Guard: partner must never be the payer
+    const partner = (splitPartner && splitPartner !== paidBy)
+      ? splitPartner
+      : MEMBERS.find(m => m !== paidBy);
+    const half = Math.floor(amount / 2);
+    shares[paidBy]  = half + (amount - half * 2); // payer gets any odd rupee
+    shares[partner] = half;
+    MEMBERS.filter(m => m !== paidBy && m !== partner).forEach(m => { shares[m] = 0; });
+    return shares;
+  }
+  if (currentSplitType === 'custom') {
+    MEMBERS.forEach(m => { shares[m] = customAmounts[m] || 0; });
+    return shares;
+  }
+  return shares;
+}
+
+// ═══════════════════════════════
+//  ADD EXPENSE
+// ═══════════════════════════════
+async function addExpense() {
+  const name   = document.getElementById('expName').value.trim();
+  const amt    = parseFloat(document.getElementById('expAmount').value);
+  const paidBy = document.getElementById('expPaidBy').value;
+  const cat    = document.getElementById('expCat').value;
+  const date   = document.getElementById('expDate').value;
+
+  if (!name) { hl('expName'); return; }
+  if (!amt || amt <= 0) { hl('expAmount'); return; }
+  if (!date) { hl('expDate'); return; }
+
+  if (currentSplitType === 'custom') {
+    const total = MEMBERS.reduce((s,m) => s + (customAmounts[m]||0), 0);
+    if (Math.abs(total - amt) > 1) {
+      toast(`Custom shares total ${fmt(total)} but expense is ${fmt(amt)} — please fix.`, 'danger'); return;
+    }
+  }
+
+  const shares = computeShares(amt, paidBy);
+  const expense = { id: Date.now(), name, amount: amt, cat, date, paidBy, splitType: currentSplitType, shares };
+  expenses.unshift(expense);
+  render();
+  await apiPost('/api/expenses', expense);
+
+  document.getElementById('expName').value = '';
+  document.getElementById('expAmount').value = '';
+  document.getElementById('splitDetail').style.display = 'none';
+  customAmounts = {};
+  const splitLabel = {equal3:'3-way split', equal2:'2-way split', personal:'personal', custom:'custom split'}[currentSplitType];
+  toast(`Expense added (${splitLabel})`, 'success');
+}
+
+async function addIncome() {
+  const person = document.getElementById('incPerson').value;
+  const name   = document.getElementById('incName').value.trim();
+  const amt    = parseFloat(document.getElementById('incAmount').value);
+  const source = document.getElementById('incSource').value;
+  const date   = document.getElementById('incDate').value;
+  if (!name) { hl('incName'); return; }
+  if (!amt || amt <= 0) { hl('incAmount'); return; }
+  if (!date) { hl('incDate'); return; }
+  const income = { id: Date.now(), person, name, amount: amt, source, date };
+  incomes.unshift(income);
+  render();
+  await apiPost('/api/incomes', income);
+  document.getElementById('incName').value = '';
+  document.getElementById('incAmount').value = '';
+  toast(`Income added: ${name} (${person.split(' ')[0]})`, 'success');
+}
+
+// ═══════════════════════════════
+//  DELETE
+// ═══════════════════════════════
+async function delExp(id) {
+  expenses = expenses.filter(e => e.id !== id);
+  render();
+  await apiDelete(`/api/expenses/${id}`);
+}
+async function delInc(id) {
+  incomes = incomes.filter(i => i.id !== id);
+  render();
+  await apiDelete(`/api/incomes/${id}`);
+}
+
+// ═══════════════════════════════
+//  FILTERS
+// ═══════════════════════════════
+function setExpFilter(cat) {
+  activeExpF = cat;
+  document.querySelectorAll('#expFilterBar .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+  renderExpList();
+}
+function setIncFilter(person) {
+  activeIncF = person;
+  document.querySelectorAll('#incFilterBar .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.p === person));
+  renderIncList();
+}
+
+// ═══════════════════════════════
+//  TAB SWITCH
+// ═══════════════════════════════
+function switchTab(tab) {
+  const tabs = ['expenses','income','owing','balances'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tab === tabs[i]));
+  tabs.forEach(t => document.getElementById(`tab-${t}`).classList.toggle('active', tab === t));
+  if (tab === 'balances') renderBalances();
+}
+
+// ═══════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════
+function render() {
+  renderPool();
+  renderMembers();
+  renderExpFilterBar();
+  renderExpList();
+  renderExpBreakdown();
+  renderIncList();
+  renderIncBreakdown();
+  renderMemberBalances();
+}
+
+// ═══════════════════════════════
+//  POOL
+// ═══════════════════════════════
+function renderPool() {
+  const totalInc = incomes.reduce((s,i) => s+i.amount, 0);
+  const totalExp = expenses.reduce((s,e) => s+e.amount, 0);
+  const net = totalInc - totalExp;
+
+  const bsNow = todayBS();
+  const mInc = incomes.filter(i => { const b=adToBS(new Date(i.date+'T12:00:00')); return b.y===bsNow.y&&b.m===bsNow.m; }).reduce((s,i)=>s+i.amount,0);
+  const mExp = expenses.filter(e => { const b=adToBS(new Date(e.date+'T12:00:00')); return b.y===bsNow.y&&b.m===bsNow.m; }).reduce((s,e)=>s+e.amount,0);
+  const mNet = mInc - mExp;
+
+  document.getElementById('poolIncome').textContent  = fmt(totalInc);
+  document.getElementById('poolIncSub').textContent  = `${incomes.length} income entr${incomes.length!==1?'ies':'y'}`;
+  document.getElementById('poolExpense').textContent = fmt(totalExp);
+  document.getElementById('poolExpSub').textContent  = `${expenses.length} expense entr${expenses.length!==1?'ies':'y'}`;
+
+  const mEl = document.getElementById('poolMonth');
+  mEl.textContent = (mNet<0?'−':'+') + fmt(Math.abs(mNet));
+  mEl.className = 'pool-value ' + (mNet>=0?'pos':'neg');
+  document.getElementById('poolMonthSub').textContent = BS_MONTHS_NP[bsNow.m-1] + ' ' + bsNow.y + ' को';
+
+  const nEl = document.getElementById('poolNet');
+  nEl.textContent = fmt(Math.abs(net));
+  nEl.className = 'pool-value ' + (net>0?'pos':net<0?'neg':'neu');
+  document.getElementById('poolNetSub').textContent = net>=0 ? `surplus of ${fmt(net)}` : `deficit of ${fmt(Math.abs(net))}`;
+}
+
+// ═══════════════════════════════
+//  MEMBERS
+// ═══════════════════════════════
+function renderMembers() {
+  ['Arya Lamsal','Umanga Regmi','Gaurav Laudari'].forEach(p => {
+    const k = MEMBER_KEYS[p];
+    const rows = incomes.filter(i => i.person === p);
+    document.getElementById(`${k}-total`).textContent = fmt(rows.reduce((s,i)=>s+i.amount,0));
+    document.getElementById(`${k}-sub`).textContent = `${rows.length} income entr${rows.length!==1?'ies':'y'}`;
+  });
+}
+
+function renderMemberBalances() {
+  const net = computeNetBalances();
+  MEMBERS.forEach(p => {
+    const k = MEMBER_KEYS[p];
+    const n = net[p];
+    const el = document.getElementById(`${k}-balance`);
+    const sub = document.getElementById(`${k}-balance-sub`);
+    if (!el) return;
+    if (n === 0) {
+      el.textContent = 'Settled ✓';
+      el.style.color = 'var(--amber)';
+      sub.textContent = 'All clear';
+    } else if (n > 0) {
+      el.textContent = `+${fmt(n)}`;
+      el.style.color = 'var(--green)';
+      sub.textContent = 'is owed by others';
+    } else {
+      el.textContent = `−${fmt(Math.abs(n))}`;
+      el.style.color = 'var(--red)';
+      sub.textContent = 'owes to others';
+    }
+  });
+}
+
+// ═══════════════════════════════
+//  EXP FILTER BAR
+// ═══════════════════════════════
+function renderExpFilterBar() {
+  const cats = ['All', ...Object.keys(CAT_COLORS).filter(c => expenses.some(e => e.cat===c))];
+  document.getElementById('expFilterBar').innerHTML = cats.map(c =>
+    `<button class="filter-btn${c===activeExpF?' active':''}" data-cat="${c}" onclick="setExpFilter('${c}')">${c}</button>`
+  ).join('');
+}
+
+// ═══════════════════════════════
+//  EXP LIST
+// ═══════════════════════════════
+function renderExpList() {
+  const list = document.getElementById('expenseList');
+  const rows = activeExpF==='All' ? expenses : expenses.filter(e=>e.cat===activeExpF);
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state"><span class="icon">◈</span>${expenses.length?'No entries in this category.':'No expenses yet. Add your first →'}</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(e=>{
+    const paidByName = e.paidBy ? M_SHORT[e.paidBy] : '—';
+    const splitLabel = e.splitType === 'equal3' ? '3-way' : e.splitType === 'equal2' ? '2-way' : e.splitType === 'custom' ? 'custom' : 'personal';
+    const badgeCls = e.splitType === 'personal' ? 'badge-solo' : e.splitType === 'custom' ? 'badge-partial' : 'badge-split';
+    return `
+    <div class="tx-item" style="grid-template-columns:auto 1fr auto auto auto;">
+      <div class="cat-dot" style="background:${CAT_COLORS[e.cat]}"></div>
+      <div class="tx-info">
+        <div class="tx-name">${esc(e.name)}</div>
+        <div class="tx-meta">${e.cat} · ${fmtBS(e.date)} · Paid by <span style="color:${M_COL[e.paidBy]||'var(--text-muted)'}">${paidByName}</span></div>
+      </div>
+      <span class="exp-split-badge ${badgeCls}">${splitLabel}</span>
+      <div class="tx-amount exp">−${fmt(e.amount)}</div>
+      <button class="delete-btn" onclick="delExp(${e.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════
+//  EXP BREAKDOWN
+// ═══════════════════════════════
+function renderExpBreakdown() {
+  const totals = {};
+  expenses.forEach(e => { totals[e.cat]=(totals[e.cat]||0)+e.amount; });
+  const entries = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const maxv = entries[0]?.[1]||1;
+  const el = document.getElementById('expBreakdown');
+  if (!entries.length) { el.innerHTML=`<div style="color:var(--text-dim);font-size:0.75rem;text-align:center;padding:14px 0;">No data yet</div>`; return; }
+  el.innerHTML = entries.map(([cat,amt])=>`
+    <div class="bd-item">
+      <div class="bd-header">
+        <span class="bd-name"><span class="cat-dot" style="background:${CAT_COLORS[cat]}"></span>${cat}</span>
+        <span class="bd-amt">${fmt(amt)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(amt/maxv*100).toFixed(1)}%;background:${CAT_COLORS[cat]}"></div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════
+//  INC LIST
+// ═══════════════════════════════
+function renderIncList() {
+  const list = document.getElementById('incomeList');
+  const rows = activeIncF==='All' ? incomes : incomes.filter(i=>i.person===activeIncF);
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state"><span class="icon">◈</span>${incomes.length?'No entries for this person.':'No income added yet →'}</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(i=>`
+    <div class="tx-item">
+      <div class="cat-dot" style="background:${MEMBER_COLORS[i.person]}"></div>
+      <div class="tx-info">
+        <div class="tx-name">${esc(i.name)}</div>
+        <div class="tx-meta">${i.person.split(' ')[0]} · ${i.source} · ${fmtBS(i.date)}</div>
+      </div>
+      <div class="tx-amount inc">+${fmt(i.amount)}</div>
+      <button class="delete-btn" onclick="delInc(${i.id})">✕</button>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════
+//  INC BREAKDOWN
+// ═══════════════════════════════
+function renderIncBreakdown() {
+  const totals = {};
+  incomes.forEach(i => { totals[i.source]=(totals[i.source]||0)+i.amount; });
+  const entries = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const maxv = entries[0]?.[1]||1;
+  const el = document.getElementById('incBreakdown');
+  if (!entries.length) { el.innerHTML=`<div style="color:var(--text-dim);font-size:0.75rem;text-align:center;padding:14px 0;">No data yet</div>`; return; }
+  el.innerHTML = entries.map(([src,amt])=>`
+    <div class="bd-item">
+      <div class="bd-header">
+        <span class="bd-name"><span class="cat-dot" style="background:${SRC_COLORS[src]||'#7a7d8a'}"></span>${src}</span>
+        <span class="bd-amt">${fmt(amt)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(amt/maxv*100).toFixed(1)}%;background:${SRC_COLORS[src]||'#7a7d8a'}"></div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════
+//  UTILS
+// ═══════════════════════════════
+function fmt(n) { return 'Rs ' + Math.round(n).toLocaleString('en-IN'); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hl(id) { const el=document.getElementById(id); el.style.borderColor='var(--red)'; el.focus(); setTimeout(()=>el.style.borderColor='',1300); }
+
+function toast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = (type==='success'?'✓ ':'✕ ') + msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2700);
+}
+
+// ═══════════════════════════════
+//  OWING SYSTEM
+// ═══════════════════════════════
+let debts = [];  // loaded from API on boot
+let activeOwingF = 'all';
+
+const MEMBERS = ['Arya Lamsal', 'Umanga Regmi', 'Gaurav Laudari'];
+const M_SHORT  = { 'Arya Lamsal': 'Arya', 'Umanga Regmi': 'Umanga', 'Gaurav Laudari': 'Gaurav' };
+const M_COL    = { 'Arya Lamsal': 'var(--amber)', 'Umanga Regmi': 'var(--teal)', 'Gaurav Laudari': 'var(--purple)' };
+
+// Set default date for debt form
+document.getElementById('debtDate').value = todayAD;
+
+function saveDebts() {} // no-op — each operation calls API directly
+
+async function addDebt() {
+  const from  = document.getElementById('debtFrom').value;
+  const to    = document.getElementById('debtTo').value;
+  const amt   = parseFloat(document.getElementById('debtAmount').value);
+  const desc  = document.getElementById('debtDesc').value.trim();
+  const date  = document.getElementById('debtDate').value;
+
+  if (from === to) { toast('Cannot owe yourself — pick two different people.', 'danger'); return; }
+  if (!amt || amt <= 0) { hl('debtAmount'); return; }
+  if (!desc) { hl('debtDesc'); return; }
+  if (!date) { hl('debtDate'); return; }
+
+  const debt = { id: Date.now(), from, to, amount: amt, desc, date, settled: false, settledDate: null };
+  debts.unshift(debt);
+  renderOwing();
+  await apiPost('/api/debts', debt);
+  document.getElementById('debtAmount').value = '';
+  document.getElementById('debtDesc').value = '';
+  toast(`Debt added: ${M_SHORT[from]} → ${M_SHORT[to]}`, 'success');
+}
+  document.getElementById('debtAmount').value = '';
+  document.getElementById('debtDesc').value = '';
+  toast(`Debt added: ${M_SHORT[from]} → ${M_SHORT[to]}`, 'success');
+}
+
+async function toggleSettle(id) {
+  const debt = debts.find(d => d.id === id);
+  if (!debt) return;
+  const bs = todayBS();
+  if (debt.settled) {
+    debt.settled = false;
+    debt.settledDate = null;
+    toast(`Debt reopened`, 'danger');
+  } else {
+    debt.settled = true;
+    debt.settledDate = `${bs.d} ${BS_MONTHS_NP[bs.m-1]} ${bs.y}`;
+    toast(`Debt settled ✓`, 'success');
+  }
+  renderOwing();
+  await apiPut(`/api/debts/${id}`, { settled: debt.settled, settledDate: debt.settledDate });
+}
+
+async function delDebt(id) {
+  debts = debts.filter(d => d.id !== id);
+  renderOwing();
+  await apiDelete(`/api/debts/${id}`);
+}
+
+function setOwingFilter(f) {
+  activeOwingF = f;
+  document.querySelectorAll('#owingFilterBar .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  renderDebtList();
+}
+
+function renderOwing() {
+  renderOwingMatrix();
+  renderDebtList();
+  renderOwingSummary();
+}
+
+// ── Net balance matrix (who is owed vs owes overall) ──
+function renderOwingMatrix() {
+  // Compute net balance for each person: positive = others owe them; negative = they owe others
+  const net = {};
+  MEMBERS.forEach(m => net[m] = 0);
+  debts.filter(d => !d.settled).forEach(d => {
+    net[d.to]   += d.amount; // creditor gains
+    net[d.from] -= d.amount; // debtor loses
+  });
+
+  const el = document.getElementById('owingNetMatrix');
+  el.innerHTML = MEMBERS.map(m => {
+    const n = net[m];
+    const cls = n > 0 ? 'owed-positive' : n < 0 ? 'owed-negative' : '';
+    const valCls = n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero';
+    const label = n > 0 ? 'is owed' : n < 0 ? 'owes' : 'settled up';
+    const initials = m.split(' ').map(w=>w[0]).join('');
+    return `
+      <div class="net-card ${cls}">
+        <div style="width:32px;height:32px;border-radius:50%;background:${M_COL[m]};display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;color:#000;font-size:0.9rem;margin:0 auto 10px;">${initials}</div>
+        <div class="net-card-name">${M_SHORT[m]}</div>
+        <div class="net-card-val ${valCls}">${n !== 0 ? fmt(Math.abs(n)) : '—'}</div>
+        <div class="net-card-sub">${label}</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Debt list ──
+function renderDebtList() {
+  const list = document.getElementById('debtList');
+  let rows = [...debts];
+
+  if (activeOwingF === 'unsettled') rows = rows.filter(d => !d.settled);
+  else if (activeOwingF === 'settled') rows = rows.filter(d => d.settled);
+  else if (MEMBERS.includes(activeOwingF)) rows = rows.filter(d => d.from === activeOwingF || d.to === activeOwingF);
+
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state"><span class="icon">◈</span>${debts.length ? 'No entries match this filter.' : 'No debts recorded yet. Add one →'}</div>`;
+    return;
+  }
+
+  list.innerHTML = rows.map(d => {
+    const isPayment = d.isPayment;
+    return `
+    <div class="debt-item ${d.settled ? 'settled' : ''}" style="${isPayment?'border-color:var(--green);opacity:0.85;':''}">
+      <div class="debt-arrow">
+        <span class="debt-from" style="color:${M_COL[d.from]}">${M_SHORT[d.from]}</span>
+        <span class="arrow-icon">${isPayment?'💸':'→'}</span>
+        <span class="debt-to" style="color:${M_COL[d.to]}">${M_SHORT[d.to]}</span>
+      </div>
+      <div class="debt-info">
+        <div class="debt-desc">${isPayment?'<span style="color:var(--green);font-size:0.7rem;">PAYMENT</span> ' : ''}${esc(d.desc)}</div>
+        <div class="debt-meta">${fmtBS(d.date)}${d.settled && d.settledDate ? ` · Settled ${d.settledDate}` : ''}</div>
+      </div>
+      <div class="debt-amount" style="${isPayment?'color:var(--green);':''}">${isPayment?'+':''}${fmt(d.amount)}</div>
+      <div style="display:flex;gap:5px;align-items:center;">
+        ${!isPayment ? `<button class="settle-btn ${d.settled ? 'settled-state' : ''}" onclick="toggleSettle(${d.id})">${d.settled ? 'Reopen' : 'Settle ✓'}</button>` : ''}
+        <button class="delete-btn" onclick="delDebt(${d.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Owing summary: simplest possible net payments ──
+function renderOwingSummary() {
+  const el = document.getElementById('owingSummary');
+  // Build net pairwise: how much A owes B net (after netting)
+  const pairNet = {}; // key: "from→to", val: net amount
+  debts.filter(d => !d.settled).forEach(d => {
+    const fwd = `${d.from}→${d.to}`;
+    const rev = `${d.to}→${d.from}`;
+    if (pairNet[rev] !== undefined) {
+      pairNet[rev] -= d.amount;
+      if (pairNet[rev] < 0) { pairNet[fwd] = -pairNet[rev]; delete pairNet[rev]; }
+      else if (pairNet[rev] === 0) delete pairNet[rev];
+    } else {
+      pairNet[fwd] = (pairNet[fwd] || 0) + d.amount;
+    }
+  });
+
+  const simplifiedEntries = Object.entries(pairNet).filter(([,v]) => v > 0);
+
+  if (!simplifiedEntries.length) {
+    const hasSettled = debts.some(d => d.settled);
+    el.innerHTML = `<div style="color:${debts.length?'var(--green)':'var(--text-dim)'};font-size:0.75rem;text-align:center;padding:14px 0;">${debts.length ? (hasSettled ? '✓ All debts settled!' : '✓ All clear!') : 'No debts yet'}</div>`;
+    return;
+  }
+
+  el.innerHTML = simplifiedEntries.map(([key, amt]) => {
+    const [from, to] = key.split('→');
+    return `
+      <div class="bd-item" style="padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;">
+            <span style="color:${M_COL[from]};font-weight:500;">${M_SHORT[from]}</span>
+            <span style="color:var(--text-dim);">owes</span>
+            <span style="color:${M_COL[to]};font-weight:500;">${M_SHORT[to]}</span>
+          </div>
+          <span style="font-family:var(--serif);color:var(--red);font-size:0.9rem;">${fmt(amt)}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════
+//  BALANCE ENGINE
+// ═══════════════════════════════
+// net[person] = how much others owe them (positive) or they owe others (negative)
+// Sources: shared expenses + manual debts (unsettled) - debt settlements
+function computeNetBalances() {
+  const net = {};
+  MEMBERS.forEach(m => net[m] = 0);
+
+  // 1. From shared expenses: payer is owed back each other person's share
+  expenses.forEach(e => {
+    if (!e.paidBy || !e.shares || e.splitType === 'personal') return;
+    MEMBERS.forEach(m => {
+      if (m === e.paidBy) return;
+      const share = e.shares[m] || 0;
+      if (share === 0) return;
+      net[e.paidBy] += share;  // payer is owed
+      net[m]        -= share;  // member owes
+    });
+  });
+
+  // 2. From manual debts in the Owing tab (unsettled only)
+  debts.filter(d => !d.settled).forEach(d => {
+    net[d.to]   += d.amount;
+    net[d.from] -= d.amount;
+  });
+
+  return net;
+}
+
+// Minimum-transfers settlement algorithm
+function computeSettlements() {
+  const net = computeNetBalances();
+  const creditors = []; // owed money
+  const debtors   = []; // owe money
+  MEMBERS.forEach(m => {
+    if (net[m] > 0.5)  creditors.push({ person: m, amount: net[m] });
+    if (net[m] < -0.5) debtors.push({ person: m, amount: -net[m] });
+  });
+
+  const settlements = [];
+  let ci = 0, di = 0;
+  while (ci < creditors.length && di < debtors.length) {
+    const c = creditors[ci];
+    const d = debtors[di];
+    const transfer = Math.min(c.amount, d.amount);
+    settlements.push({ from: d.person, to: c.person, amount: Math.round(transfer) });
+    c.amount -= transfer;
+    d.amount -= transfer;
+    if (c.amount < 0.5) ci++;
+    if (d.amount < 0.5) di++;
+  }
+  return settlements;
+}
+
+function renderBalances() {
+  const net = computeNetBalances();
+  const settlements = computeSettlements();
+
+  // ── Balance cards ──
+  const cardsEl = document.getElementById('balanceCards');
+  cardsEl.innerHTML = MEMBERS.map(m => {
+    const n = net[m];
+    const cls = n > 0.5 ? 'owed' : n < -0.5 ? 'owes' : 'clear';
+    const valCls = n > 0.5 ? 'owed-val' : n < -0.5 ? 'owes-val' : 'clear-val';
+    const statusTxt = n > 0.5 ? 'is owed by roommates' : n < -0.5 ? 'owes roommates' : 'All settled ✓';
+    const initials = m.split(' ').map(w=>w[0]).join('');
+
+    // Breakdown: what this person is owed (from expenses they paid) and what they owe
+    const owedToMe = [];   // others owe this person
+    const iOwe    = [];    // this person owes others
+
+    expenses.forEach(e => {
+      if (!e.paidBy || !e.shares || e.splitType === 'personal') return;
+      // This person paid — others owe them
+      if (e.paidBy === m) {
+        MEMBERS.forEach(other => {
+          if (other === m) return;
+          const s = e.shares[other] || 0;
+          if (s > 0) owedToMe.push({ label: `${M_SHORT[other]} owes for "${esc(e.name)}"`, amt: s });
+        });
+      }
+      // This person has a share in someone else's expense — they owe the payer
+      if (e.paidBy !== m && (e.shares[m] || 0) > 0) {
+        iOwe.push({ label: `Owes ${M_SHORT[e.paidBy]} for "${esc(e.name)}"`, amt: e.shares[m] });
+      }
+    });
+
+    // Manual unsettled debts
+    debts.filter(d => !d.settled).forEach(d => {
+      if (d.to === m)   owedToMe.push({ label: `${M_SHORT[d.from]} owes (${esc(d.desc)})`, amt: d.amount });
+      if (d.from === m) iOwe.push({ label: `Owes ${M_SHORT[d.to]} (${esc(d.desc)})`, amt: d.amount });
+    });
+
+    const allBreakdown = [...owedToMe.slice(0,2), ...iOwe.slice(0,2)];
+    const extra = (owedToMe.length + iOwe.length) - allBreakdown.length;
+
+    return `<div class="balance-card ${cls}">
+      <div class="balance-avatar" style="background:${M_COL[m]}">${initials}</div>
+      <div class="balance-name">${m}</div>
+      <div class="balance-amount ${valCls}">${n > 0.5 ? '+' : n < -0.5 ? '−' : ''}${Math.abs(n) > 0.5 ? fmt(Math.abs(n)) : '—'}</div>
+      <div class="balance-status">${statusTxt}</div>
+      ${allBreakdown.length ? `<div class="balance-breakdown">
+        ${allBreakdown.map(b=>`<div><span>${b.label}</span><span>${fmt(b.amt)}</span></div>`).join('')}
+        ${extra > 0 ? `<div><span style="color:var(--text-dim)">+${extra} more</span></div>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  // ── Settlement suggestions ──
+  const settlEl = document.getElementById('settlementRows');
+  if (!settlements.length) {
+    settlEl.innerHTML = `<div style="color:var(--green);font-size:0.82rem;text-align:center;padding:20px 0;">✓ Everyone is balanced — no payments needed!</div>`;
+  } else {
+    settlEl.innerHTML = settlements.map(s => `
+      <div class="settlement-row">
+        <div class="settlement-people">
+          <span class="settlement-from" style="color:${M_COL[s.from]}">${M_SHORT[s.from]}</span>
+          <span class="settlement-arrow">→ pays →</span>
+          <span class="settlement-to" style="color:${M_COL[s.to]}">${M_SHORT[s.to]}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div class="settlement-amount">${fmt(s.amount)}</div>
+          <button class="mark-paid-btn" onclick="quickSettle('${s.from}','${s.to}',${s.amount})">Record Payment ✓</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Shared expense history ──
+  const sharedEl = document.getElementById('sharedExpList');
+  const shared = expenses.filter(e => e.paidBy && e.splitType && e.splitType !== 'personal');
+  if (!shared.length) {
+    sharedEl.innerHTML = `<div class="empty-state"><span class="icon">◈</span>No shared expenses yet.</div>`;
+    return;
+  }
+  sharedEl.innerHTML = shared.map(e => {
+    const sharesStr = MEMBERS
+      .filter(m => (e.shares[m] || 0) > 0)
+      .map(m => `<span style="color:${M_COL[m]}">${M_SHORT[m]}: ${fmt(e.shares[m])}</span>`)
+      .join(' · ');
+    return `
+      <div class="tx-item" style="grid-template-columns:auto 1fr auto auto;">
+        <div class="cat-dot" style="background:${CAT_COLORS[e.cat]}"></div>
+        <div class="tx-info">
+          <div class="tx-name">${esc(e.name)}</div>
+          <div class="tx-meta">${fmtBS(e.date)} · Paid by <span style="color:${M_COL[e.paidBy]}">${M_SHORT[e.paidBy]}</span></div>
+          <div class="tx-meta" style="margin-top:3px;">${sharesStr}</div>
+        </div>
+        <div class="tx-amount exp">−${fmt(e.amount)}</div>
+        <button class="delete-btn" onclick="delExp(${e.id});renderBalances()">✕</button>
+      </div>`;
+  }).join('');
+}
+
+async function quickSettle(from, to, amount) {
+  const bs = todayBS();
+  const payment = {
+    id: Date.now(),
+    from: to,
+    to: from,
+    amount,
+    desc: `Settlement payment`,
+    date: todayAD,
+    settled: false,
+    settledDate: null,
+    isPayment: true
+  };
+  debts.push(payment);
+  renderOwing();
+  renderBalances();
+  renderMemberBalances();
+  await apiPost('/api/debts', payment);
+  toast(`Payment recorded: ${M_SHORT[from]} paid ${M_SHORT[to]} ${fmt(amount)} ✓`, 'success');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (['expName','expAmount'].includes(e.target.id)) addExpense();
+    if (['incName','incAmount'].includes(e.target.id)) addIncome();
+  }
+});
+
+// ═══════════════════════════════
+//  BOOT — load from database
+// ═══════════════════════════════
+async function boot() {
+  // Show loading state
+  document.getElementById('expenseList').innerHTML = `<div class="empty-state"><span class="icon">⏳</span>Loading data...</div>`;
+
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    expenses = data.expenses || [];
+    incomes  = data.incomes  || [];
+    debts    = data.debts    || [];
+  } catch(e) {
+    console.error('Failed to load data:', e);
+    toast('Could not connect to server. Running offline.', 'danger');
+    // Fall back to localStorage as backup
+    expenses = JSON.parse(localStorage.getItem('ledger_exp2') || '[]');
+    incomes  = JSON.parse(localStorage.getItem('ledger_inc2') || '[]');
+    debts    = JSON.parse(localStorage.getItem('ledger_debts') || '[]');
+  }
+
+  setSplit('equal3', document.querySelector('.split-opt[data-split="equal3"]'));
+  render();
+  renderOwing();
+}
+
+boot();
+</script>
+</body>
+</html>
